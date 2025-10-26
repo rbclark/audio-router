@@ -15,7 +15,7 @@ namespace AudioRouter {
         /// <summary>
         /// This is the heart of the web server
         /// </summary>
-        private static readonly HttpListener Listener = new HttpListener { Prefixes = { $"http://localhost:{Port}/" } };
+        private static readonly HttpListener Listener = new HttpListener { Prefixes = { $"http://*:{Port}/" } };
 
         /// <summary>
         /// A flag to specify when we need to stop
@@ -74,6 +74,7 @@ namespace AudioRouter {
         /// </summary>
         /// <param name="context">The context of the incoming request</param>
         private static void ProcessRequest(HttpListenerContext context) {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Incoming request: {context.Request.HttpMethod} {context.Request.Url}");
             using (var response = context.Response) {
                 try {
                     var handled = false;
@@ -81,12 +82,13 @@ namespace AudioRouter {
                         //This is where we do different things depending on the URL
                         //TODO: Add cases for each URL we want to respond to
                         case "/devices":
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Handling /devices request");
                             //Get the current settings
                             response.ContentType = "application/json";
-                            
+
                             //This is what we want to send back
                             var responseBody = JsonConvert.SerializeObject(AudioRouter.Program.GetDevices());
-                            
+
                             //Write it to the response stream
                             var buffer = Encoding.UTF8.GetBytes(responseBody);
                             response.ContentLength64 = buffer.Length;
@@ -94,19 +96,24 @@ namespace AudioRouter {
                             handled = true;
                             break;
                         case "/play":
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Handling /play request");
                             var guid = context.Request.QueryString["device"];
                             var file = context.Request.QueryString["file"];
                             var volume = context.Request.QueryString["volume"];
+                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Parameters - device: {guid}, file: {file}, volume: {volume ?? "not specified"}");
                             Task.Factory.StartNew(() => AudioRouter.Program.PlayOnDevice(guid, file, volume));
                             response.StatusCode = 204;
                             handled = true;
                             break;
                     }
                     if (!handled) {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Request not handled - returning 404");
                         response.StatusCode = 404;
                     }
                 } catch (Exception e) {
                     //Return the exception details the client - you may or may not want to do this
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ERROR processing request: {e.Message}");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stack trace: {e.StackTrace}");
                     response.StatusCode = 500;
                     response.ContentType = "application/json";
                     var buffer = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(e));
